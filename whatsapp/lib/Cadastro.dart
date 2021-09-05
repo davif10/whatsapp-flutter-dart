@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:whatsapp/Home.dart';
@@ -56,7 +57,13 @@ class _CadastroState extends State<Cadastro> {
         password: usuario.senha
     ).then((firebaseUser){
 
-      Navigator.push(
+      //Salvando dados
+      Firestore db = Firestore.instance;
+      db.collection("usuarios")
+      .document(firebaseUser.uid)
+      .setData(usuario.toMap());
+
+      Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => Home()));
 
