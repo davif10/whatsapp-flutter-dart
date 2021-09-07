@@ -1,8 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:whatsapp/Cadastro.dart';
-
-import 'Home.dart';
 import 'model/Usuario.dart';
 
 class Login extends StatefulWidget {
@@ -48,9 +46,7 @@ class _LoginState extends State<Login> {
         email: usuario.email,
         password: usuario.senha
     ).then((value) {
-      Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => Home()));
+      Navigator.pushReplacementNamed(context, "/home");
     }).catchError((error){
       setState(() {
         _mensagemErro = "Erro ao autenticar usuário, verifique e-mail e senha.";
@@ -62,9 +58,7 @@ class _LoginState extends State<Login> {
     FirebaseAuth auth = FirebaseAuth.instance;
     FirebaseUser  usuarioLogado = await auth.currentUser();
     if(usuarioLogado != null){
-      Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => Home()));
+      Navigator.pushReplacementNamed(context, "/home");
     }
 
   }

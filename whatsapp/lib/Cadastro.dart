@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:whatsapp/Home.dart';
 import 'package:whatsapp/model/Usuario.dart';
 
 class Cadastro extends StatefulWidget {
@@ -63,9 +62,7 @@ class _CadastroState extends State<Cadastro> {
       .document(firebaseUser.uid)
       .setData(usuario.toMap());
 
-      Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => Home()));
+      Navigator.pushNamedAndRemoveUntil(context, "/home", (route) => false);
 
     }).catchError((error){
       setState(() {
