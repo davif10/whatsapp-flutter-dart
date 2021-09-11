@@ -176,9 +176,6 @@ class _ConfiguracoesState extends State<Configuracoes> {
                         border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(32))
                     ),
-                    // onChanged: (texto){
-                    //   _atualizarNomeFirestore(texto);
-                    // },
                   ),
                 ),
                 Padding(
