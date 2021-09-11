@@ -1,5 +1,8 @@
 import 'dart:io';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -12,6 +15,9 @@ class Configuracoes extends StatefulWidget {
 class _ConfiguracoesState extends State<Configuracoes> {
   TextEditingController _controllerNome = TextEditingController();
   File _imagem;
+  String _idUsuarioLogado;
+  bool _subindoImagem = false;
+  String _urlImagemRecuperada;
 
   _recuperarImagem(String origemImagem) async{
     File imagemSelecionada;
@@ -26,7 +32,89 @@ class _ConfiguracoesState extends State<Configuracoes> {
 
     setState(() {
       _imagem = imagemSelecionada;
+      if(_imagem != null){
+        _subindoImagem = true;
+        _uploadImagem();
+      }
     });
+  }
+
+  _uploadImagem() async{
+    FirebaseStorage storage = FirebaseStorage.instance;
+    StorageReference pastaRaiz = storage.ref();
+    StorageReference arquivo = pastaRaiz
+    .child("perfil")
+    .child("$_idUsuarioLogado.jpg");
+
+    StorageUploadTask task = arquivo.putFile(_imagem);
+    task.events.listen((storageEvent) {
+      if(storageEvent.type == StorageTaskEventType.progress){
+        setState(() {
+          _subindoImagem = true;
+        });
+      } else if(storageEvent.type == StorageTaskEventType.success){
+        setState(() {
+          _subindoImagem = false;
+        });
+      }
+    });
+
+    task.onComplete.then((snapshot){
+      _recuperarUrlImagem(snapshot);
+    });
+  }
+
+  _recuperarUrlImagem(StorageTaskSnapshot snapshot) async{
+      String url = await snapshot.ref.getDownloadURL();
+      _atualizarImagemFirestore(url);
+      setState(() {
+        _urlImagemRecuperada = url;
+      });
+  }
+
+  _atualizarNomeFirestore(String nome) {
+    Firestore db = Firestore.instance;
+    Map<String , dynamic> dadosAtualizar = {
+      "nome": nome
+    };
+
+    db.collection("usuarios")
+        .document(_idUsuarioLogado)
+        .updateData(dadosAtualizar);
+  }
+
+  _atualizarImagemFirestore(String url) {
+    Firestore db = Firestore.instance;
+    Map<String , dynamic> dadosAtualizar = {
+      "urlImagem": url
+    };
+
+    db.collection("usuarios")
+    .document(_idUsuarioLogado)
+    .updateData(dadosAtualizar);
+  }
+
+  _recuperarDadosUsuario() async{
+    FirebaseAuth auth = FirebaseAuth.instance;
+    FirebaseUser usuarioLogado = await auth.currentUser();
+    _idUsuarioLogado = usuarioLogado.uid;
+    Firestore db = Firestore.instance;
+    DocumentSnapshot snapshot = await db.collection("usuarios")
+    .document(_idUsuarioLogado)
+    .get();
+
+    Map<String , dynamic> dados =  snapshot.data;
+    _controllerNome.text = dados["nome"];
+
+    if(dados["urlImagem"] != null){
+      _urlImagemRecuperada = dados["urlImagem"];
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _recuperarDadosUsuario();
   }
 
   @override
@@ -41,10 +129,18 @@ class _ConfiguracoesState extends State<Configuracoes> {
           child: SingleChildScrollView(
             child: Column(
               children: [
-                //carregando
+                Container(
+                  padding: EdgeInsets.all(16),
+                  child: _subindoImagem
+                      ? CircularProgressIndicator()
+                      : Container(),
+                ),
                 CircleAvatar(
                   radius: 100,
-                  backgroundImage: NetworkImage("https://avatars.githubusercontent.com/u/43782019?v=4"),
+                  backgroundImage:
+                  _urlImagemRecuperada != null
+                  ? NetworkImage(_urlImagemRecuperada)
+                  : null,
                   backgroundColor: Colors.grey,
                 ),
 
@@ -78,7 +174,11 @@ class _ConfiguracoesState extends State<Configuracoes> {
                         filled: true,
                         fillColor: Colors.white,
                         border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(32))),
+                            borderRadius: BorderRadius.circular(32))
+                    ),
+                    // onChanged: (texto){
+                    //   _atualizarNomeFirestore(texto);
+                    // },
                   ),
                 ),
                 Padding(
@@ -94,7 +194,7 @@ class _ConfiguracoesState extends State<Configuracoes> {
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(32))),
                     onPressed: () {
-
+                      _atualizarNomeFirestore(_controllerNome.text);
                     },
                   ),
                 ),
