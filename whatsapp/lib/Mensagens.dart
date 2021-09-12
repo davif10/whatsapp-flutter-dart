@@ -1,7 +1,11 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:whatsapp/model/Mensagem.dart';
 
 import 'model/Usuario.dart';
@@ -14,48 +18,91 @@ class Mensagens extends StatefulWidget {
 }
 
 class _MensagensState extends State<Mensagens> {
-  List<String> listaMensagens = [
-    "Olá tudo bem?",
-    "Tudo bem e você?",
-  ];
   TextEditingController _controllerMensagem = TextEditingController();
+  File _imagem;
+  bool _subindoImagem = false;
   String _idUsuarioLogado;
   String _idUsuarioDestinatario;
+  Firestore db = Firestore.instance;
 
-  _enviarMensagem(){
+  _enviarMensagem() {
     String textoMensagem = _controllerMensagem.text;
-    if(textoMensagem.isNotEmpty){
+    if (textoMensagem.isNotEmpty) {
       Mensagem mensagem = Mensagem();
       mensagem.idUsuario = _idUsuarioLogado;
       mensagem.mensagem = textoMensagem;
       mensagem.urlImagem = "";
       mensagem.tipo = "texto";
 
+      //Salvar mensagem para remetente
       _salvarMensagem(_idUsuarioLogado, _idUsuarioDestinatario, mensagem);
+      //Salvar mensagem para destinatário
+      _salvarMensagem(_idUsuarioDestinatario, _idUsuarioLogado, mensagem);
     }
   }
 
-  _salvarMensagem(String idRemetente, String idDestinatario, Mensagem msg) async{
-    Firestore db = Firestore.instance;
-
-    await db.collection("mensagens")
-    .document(idRemetente)
-    .collection(idDestinatario)
-    .add(msg.toMap());
+  _salvarMensagem(
+      String idRemetente, String idDestinatario, Mensagem msg) async {
+    await db
+        .collection("mensagens")
+        .document(idRemetente)
+        .collection(idDestinatario)
+        .add(msg.toMap());
 
     //Limpa texto
     _controllerMensagem.clear();
   }
-  _enviarFoto(){
 
+  _enviarFoto() async{
+    File imagemSelecionada;
+    imagemSelecionada = await ImagePicker.pickImage(source: ImageSource.gallery);
+    _subindoImagem = true;
+    String nomeImagem = DateTime.now().millisecondsSinceEpoch.toString();
+    FirebaseStorage storage = FirebaseStorage.instance;
+    StorageReference pastaRaiz = storage.ref();
+    StorageReference arquivo = pastaRaiz
+        .child("mensagens")
+        .child(_idUsuarioLogado)
+        .child("$nomeImagem jpg");
+
+    StorageUploadTask task = arquivo.putFile(imagemSelecionada);
+    task.events.listen((storageEvent) {
+      if(storageEvent.type == StorageTaskEventType.progress){
+        setState(() {
+          _subindoImagem = true;
+        });
+      } else if(storageEvent.type == StorageTaskEventType.success){
+        setState(() {
+          _subindoImagem = false;
+        });
+      }
+    });
+
+    task.onComplete.then((snapshot){
+      _recuperarUrlImagem(snapshot);
+    });
+  }
+  _recuperarUrlImagem(StorageTaskSnapshot snapshot) async{
+    String url = await snapshot.ref.getDownloadURL();
+    Mensagem mensagem = Mensagem();
+    mensagem.idUsuario = _idUsuarioLogado;
+    mensagem.mensagem = "";
+    mensagem.urlImagem = url;
+    mensagem.tipo = "imagem";
+
+    //Salvar mensagem para remetente
+    _salvarMensagem(_idUsuarioLogado, _idUsuarioDestinatario, mensagem);
+    //Salvar mensagem para destinatário
+    _salvarMensagem(_idUsuarioDestinatario, _idUsuarioLogado, mensagem);
   }
 
-  _recuperarDadosUsuario() async{
+  _recuperarDadosUsuario() async {
     FirebaseAuth auth = FirebaseAuth.instance;
     FirebaseUser usuarioLogado = await auth.currentUser();
     _idUsuarioLogado = usuarioLogado.uid;
     _idUsuarioDestinatario = widget.contato.idUsuario;
   }
+
   @override
   void initState() {
     super.initState();
@@ -83,95 +130,133 @@ class _MensagensState extends State<Mensagens> {
                     fillColor: Colors.white,
                     border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(32)),
-                  prefixIcon: IconButton(
-                    icon: Icon(Icons.camera_alt),
-                    onPressed: _enviarFoto,
-                  )
+                    prefixIcon:
+                    _subindoImagem
+                     ? CircularProgressIndicator()
+                     : IconButton(
+                      icon: Icon(Icons.camera_alt),
+                      onPressed: _enviarFoto,
+                    )
                 ),
               ),
             ),
           ),
           FloatingActionButton(
-              backgroundColor: Color(0xff075E54),
-              child: Icon(Icons.send, color: Colors.white,),
-              onPressed: _enviarMensagem,
+            backgroundColor: Color(0xff075E54),
+            child: Icon(
+              Icons.send,
+              color: Colors.white,
+            ),
+            onPressed: _enviarMensagem,
           )
         ],
       ),
     );
 
-    var listView = Expanded(
-      child: ListView.builder(
-          itemCount: listaMensagens.length,
-          itemBuilder: (context, indice){
-            double larguraContainer = MediaQuery.of(context).size.width * 0.8;
-
-
-            Alignment alinhamento = Alignment.centerRight;
-            Color cor = Color(0xffd2ffa5);
-            if(indice % 2 == 0){
-              cor = Colors.white;
-              alinhamento = Alignment.centerLeft;
-            }
-
-              return Align(
-                alignment: alinhamento,
-                child: Padding(
-                  padding: EdgeInsets.all(8),
-                  child: Container(
-                    width: larguraContainer,
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: cor,
-                      borderRadius: BorderRadius.all(Radius.circular(8))
-                    ),
-                    child: Text(listaMensagens[indice],
-                      style: TextStyle(fontSize: 18),
-                    ),
-                  ),
+    var stream = StreamBuilder(
+        stream: db
+            .collection("mensagens")
+            .document(_idUsuarioLogado)
+            .collection(_idUsuarioDestinatario)
+            .snapshots(),
+        builder: (context, snapshot) {
+          switch (snapshot.connectionState) {
+            case ConnectionState.none:
+              // TODO: Handle this case.
+              break;
+            case ConnectionState.waiting:
+              return Center(
+                child: Column(
+                  children: [
+                    Text("Carregando mensagens"),
+                    CircularProgressIndicator()
+                  ],
                 ),
               );
-          }),
-    );
-    
+              break;
+            case ConnectionState.active:
+              // TODO: Handle this case.
+              break;
+            case ConnectionState.done:
+              QuerySnapshot querySnapshot = snapshot.data;
+              if (snapshot.hasError) {
+                return Expanded(child: Text("Erro ao carregar os dados!"));
+              } else {
+                return Expanded(
+                  child: ListView.builder(
+                      itemCount: querySnapshot.documents.length,
+                      itemBuilder: (context, indice) {
+                        //Recupera mensagens
+                        List<DocumentSnapshot> mensagens = querySnapshot.documents.toList();
+                        DocumentSnapshot item = mensagens[indice];
+
+                        double larguraContainer =
+                            MediaQuery.of(context).size.width * 0.8;
+
+                        Alignment alinhamento = Alignment.centerRight;
+                        Color cor = Color(0xffd2ffa5);
+                        if (_idUsuarioLogado != item["idUsuario"]) {
+                          cor = Colors.white;
+                          alinhamento = Alignment.centerLeft;
+                        }
+
+                        return Align(
+                          alignment: alinhamento,
+                          child: Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Container(
+                              width: larguraContainer,
+                              padding: EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                  color: cor,
+                                  borderRadius:
+                                      BorderRadius.all(Radius.circular(8))),
+                              child:
+                              item["tipo"] == "texto"
+                              ? Text(item["mensagem"], style: TextStyle(fontSize: 18),)
+                              :  Image.network(item["urlImagem"]),
+                            ),
+                          ),
+                        );
+                      }),
+                );
+              }
+              break;
+          }
+        });
+
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            CircleAvatar(
-              maxRadius: 20,
-              backgroundImage:
-              widget.contato.urlImagem != null
-                  ? NetworkImage(widget.contato.urlImagem)
-                  : null,
-              backgroundColor: Colors.grey,
-            ),
-            Padding(
-              padding: const EdgeInsets.only(left: 8.0),
-              child: Text(widget.contato.nome),
-            ),
-          ],
-        )
-      ),
+          title: Row(
+        children: [
+          CircleAvatar(
+            maxRadius: 20,
+            backgroundImage: widget.contato.urlImagem != null
+                ? NetworkImage(widget.contato.urlImagem)
+                : null,
+            backgroundColor: Colors.grey,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 8.0),
+            child: Text(widget.contato.nome),
+          ),
+        ],
+      )),
       body: Container(
         width: MediaQuery.of(context).size.width,
         decoration: BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("imagens/bg.png"),
-            fit: BoxFit.cover
-          )
-        ),
+            image: DecorationImage(
+                image: AssetImage("imagens/bg.png"), fit: BoxFit.cover)),
         child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                children: [
-                  listView,
-                  caixaMensagem,
-                ],
-              ),
-            )
-        ),
+          padding: const EdgeInsets.all(8),
+          child: Column(
+            children: [
+              stream,
+              caixaMensagem,
+            ],
+          ),
+        )),
       ),
     );
   }
