@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:whatsapp/model/Mensagem.dart';
 
+import 'model/Conversa.dart';
 import 'model/Usuario.dart';
 
 class Mensagens extends StatefulWidget {
@@ -38,7 +39,32 @@ class _MensagensState extends State<Mensagens> {
       _salvarMensagem(_idUsuarioLogado, _idUsuarioDestinatario, mensagem);
       //Salvar mensagem para destinatário
       _salvarMensagem(_idUsuarioDestinatario, _idUsuarioLogado, mensagem);
+
+      //Salvar conversa
+      _salvarConversa(mensagem);
     }
+  }
+
+  _salvarConversa(Mensagem msg){
+    //Salvar conversa para o remetente
+    Conversa cRemetente = Conversa();
+    cRemetente.idRemetente = _idUsuarioLogado;
+    cRemetente.idDestinatario = _idUsuarioDestinatario;
+    cRemetente.mensagem = msg.mensagem;
+    cRemetente.nome = widget.contato.nome;
+    cRemetente.caminhoFoto = widget.contato.urlImagem;
+    cRemetente.tipoMensagem = msg.tipo;
+    cRemetente.salvar();
+
+    //Salvar conversa para o destinatário
+    Conversa cDestinatario = Conversa();
+    cDestinatario.idRemetente = _idUsuarioDestinatario;
+    cDestinatario.idDestinatario = _idUsuarioLogado;
+    cDestinatario.mensagem = msg.mensagem;
+    cDestinatario.nome = widget.contato.nome;
+    cDestinatario.caminhoFoto = widget.contato.urlImagem;
+    cDestinatario.tipoMensagem = msg.tipo;
+    cDestinatario.salvar();
   }
 
   _salvarMensagem(
@@ -180,7 +206,7 @@ class _MensagensState extends State<Mensagens> {
             case ConnectionState.done:
               QuerySnapshot querySnapshot = snapshot.data;
               if (snapshot.hasError) {
-                return Expanded(child: Text("Erro ao carregar os dados!"));
+                return Text("Erro ao carregar os dados!");
               } else {
                 return Expanded(
                   child: ListView.builder(
