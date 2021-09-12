@@ -3,18 +3,25 @@ class Usuario{
   String _email;
   String _urlImagem;
   String _senha;
+  String _idUsuario;
 
   Usuario();
 
   Map<String, dynamic> toMap(){
     Map<String, dynamic> map ={
       "nome": this.nome,
-      "email": this.email
+      "email": this.email,
     };
 
     return map;
   }
 
+
+  String get idUsuario => _idUsuario;
+
+  set idUsuario(String value) {
+    _idUsuario = value;
+  }
 
   String get senha => _senha;
 
