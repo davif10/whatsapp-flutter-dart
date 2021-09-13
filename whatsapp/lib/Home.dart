@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:whatsapp/telas/AbaContatos.dart';
@@ -65,9 +67,10 @@ class _HomeState extends State<Home> with SingleTickerProviderStateMixin{
     return Scaffold(
       appBar: AppBar(
         title: Text("Whatsapp"),
+        elevation: Platform.isIOS ? 0 : 4,
         bottom: TabBar(
           indicatorWeight: 4,
-          indicatorColor: Colors.white,
+          indicatorColor: Platform.isIOS ? Colors.grey[400] : Colors.white ,
           labelStyle: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold
