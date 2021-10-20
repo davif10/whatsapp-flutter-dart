@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:whatsapp/model/Conversa.dart';
 import 'package:whatsapp/model/Usuario.dart';
 
 class AbaConversas extends StatefulWidget {
@@ -13,20 +12,15 @@ class AbaConversas extends StatefulWidget {
 }
 
 class _AbaConversasState extends State<AbaConversas> {
-  List<Conversa> _listaConversas = [];
   final _controller = StreamController<QuerySnapshot>.broadcast();
   Firestore db = Firestore.instance;
   String _idUsuarioLogado;
+  StreamSubscription _subscription;
 
   @override
   void initState() {
     super.initState();
     _recuperarDadosUsuario();
-    Conversa conversa = Conversa();
-    conversa.nome = "Ana Clara";
-    conversa.mensagem = "Teste";
-    conversa.caminhoFoto = "";
-    _listaConversas.add(conversa);
   }
 
   Stream<QuerySnapshot> _adicionarListenerConversas() {
@@ -35,7 +29,7 @@ class _AbaConversasState extends State<AbaConversas> {
         .document(_idUsuarioLogado)
         .collection("ultima_conversa")
         .snapshots();
-    stream.listen((dados) {
+    _subscription = stream.listen((dados) {
       _controller.add(dados);
     });
   }
@@ -52,6 +46,7 @@ class _AbaConversasState extends State<AbaConversas> {
   void dispose() {
     super.dispose();
     _controller.close();
+    _subscription.cancel();
   }
 
   @override
@@ -61,8 +56,6 @@ class _AbaConversasState extends State<AbaConversas> {
         builder: (context, snapshot) {
           switch (snapshot.connectionState) {
             case ConnectionState.none:
-              // TODO: Handle this case.
-              break;
             case ConnectionState.waiting:
               return Center(
                 child: Column(
@@ -72,15 +65,13 @@ class _AbaConversasState extends State<AbaConversas> {
                   ],
                 ),
               );
-              break;
             case ConnectionState.active:
-              // TODO: Handle this case.
-              break;
             case ConnectionState.done:
               if (snapshot.hasError) {
                 return Text("Erro ao carregar os dados!");
               } else {
                 QuerySnapshot querySnapshot = snapshot.data;
+                List<DocumentSnapshot> conversas = [];
                 if (querySnapshot.documents.length == 0) {
                   return Center(
                     child: Text(
@@ -89,16 +80,15 @@ class _AbaConversasState extends State<AbaConversas> {
                           TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                   );
+                }else{
+                  conversas = querySnapshot.documents.toList();
                 }
                 return ListView.builder(
-                    itemCount: _listaConversas.length,
+                    itemCount: conversas.length,
                     itemBuilder: (context, indice) {
-                      //Recupera mensagens
-                      List<DocumentSnapshot> conversas =
-                          querySnapshot.documents.toList();
                       DocumentSnapshot item = conversas[indice];
                       String urlImagem = item["caminhoFoto"];
-                      String tipo = item["tipoMensagem"];
+                      //String tipo = item["tipoMensagem"];
                       String mensagem = item["mensagem"];
                       String nome = item["nome"];
                       String idDestinatario = item["idDestinatario"];
@@ -125,7 +115,7 @@ class _AbaConversasState extends State<AbaConversas> {
                               fontWeight: FontWeight.bold, fontSize: 16),
                         ),
                         subtitle: Text(
-                          tipo == "texto" ? mensagem : "Foto",
+                          mensagem,
                           style: TextStyle(color: Colors.grey, fontSize: 14),
                         ),
                       );
