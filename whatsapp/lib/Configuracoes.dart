@@ -107,7 +107,9 @@ class _ConfiguracoesState extends State<Configuracoes> {
     _controllerNome.text = dados["nome"];
 
     if(dados["urlImagem"] != null){
-      _urlImagemRecuperada = dados["urlImagem"];
+      setState(() {
+        _urlImagemRecuperada = dados["urlImagem"];
+      });
     }
   }
 

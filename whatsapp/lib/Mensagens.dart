@@ -23,7 +23,6 @@ class _MensagensState extends State<Mensagens> {
   TextEditingController _controllerMensagem = TextEditingController();
   final _controller = StreamController<QuerySnapshot>.broadcast();
   ScrollController _scrollController = ScrollController();
-  File _imagem;
   bool _subindoImagem = false;
   String _idUsuarioLogado;
   String _idUsuarioDestinatario;
@@ -49,7 +48,13 @@ class _MensagensState extends State<Mensagens> {
     }
   }
 
-  _salvarConversa(Mensagem msg) {
+  _salvarConversa(Mensagem msg) async{
+    //Recuperando demais dados do usuário logado
+    Firestore db = Firestore.instance;
+    DocumentSnapshot snapshot = await db.collection("usuarios")
+        .document(_idUsuarioLogado)
+        .get();
+
     //Salvar conversa para o remetente
     Conversa cRemetente = Conversa();
     cRemetente.idRemetente = _idUsuarioLogado;
@@ -65,8 +70,8 @@ class _MensagensState extends State<Mensagens> {
     cDestinatario.idRemetente = _idUsuarioDestinatario;
     cDestinatario.idDestinatario = _idUsuarioLogado;
     cDestinatario.mensagem = msg.mensagem;
-    cDestinatario.nome = widget.contato.nome;
-    cDestinatario.caminhoFoto = widget.contato.urlImagem;
+    cDestinatario.nome = snapshot.data["nome"];
+    cDestinatario.caminhoFoto = snapshot.data["urlImagem"];
     cDestinatario.tipoMensagem = msg.tipo;
     cDestinatario.salvar();
   }
@@ -118,7 +123,7 @@ class _MensagensState extends State<Mensagens> {
     String url = await snapshot.ref.getDownloadURL();
     Mensagem mensagem = Mensagem();
     mensagem.idUsuario = _idUsuarioLogado;
-    mensagem.mensagem = "";
+    mensagem.mensagem = "Foto";
     mensagem.urlImagem = url;
     mensagem.data = Timestamp.now().toString();
     mensagem.tipo = "imagem";
@@ -127,6 +132,8 @@ class _MensagensState extends State<Mensagens> {
     _salvarMensagem(_idUsuarioLogado, _idUsuarioDestinatario, mensagem);
     //Salvar mensagem para destinatário
     _salvarMensagem(_idUsuarioDestinatario, _idUsuarioLogado, mensagem);
+    //Salvar conversa
+    _salvarConversa(mensagem);
   }
 
   _recuperarDadosUsuario() async {
@@ -147,7 +154,10 @@ class _MensagensState extends State<Mensagens> {
     stream.listen((dados) {
       _controller.add(dados);
       Timer(Duration(seconds: 1),(){
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        try{
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        }catch(_){}
+
       });
     });
   }
@@ -208,8 +218,6 @@ class _MensagensState extends State<Mensagens> {
         builder: (context, snapshot) {
           switch (snapshot.connectionState) {
             case ConnectionState.none:
-              // TODO: Handle this case.
-              break;
             case ConnectionState.waiting:
               return Center(
                 child: Column(
@@ -219,10 +227,7 @@ class _MensagensState extends State<Mensagens> {
                   ],
                 ),
               );
-              break;
             case ConnectionState.active:
-              // TODO: Handle this case.
-              break;
             case ConnectionState.done:
               QuerySnapshot querySnapshot = snapshot.data;
               if (snapshot.hasError) {
@@ -271,7 +276,6 @@ class _MensagensState extends State<Mensagens> {
                       }),
                 );
               }
-              break;
           }
         });
 
